@@ -1,0 +1,58 @@
+name: racingpad_app
+description: "A professional racing controller app for PC."
+publish_to: 'none'
+
+version: 0.9.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  vibration: ^2.0.1
+  flutter_svg: ^2.0.10+1
+  mobile_scanner: ^5.2.0
+  udp: ^5.0.3
+  shared_preferences: ^2.3.5
+  google_mobile_ads: ^5.3.1
+  # Each dependency below is now listed only once to fix the 'Duplicate mapping key' error
+  http: ^1.2.0
+  package_info_plus: ^8.3.1 
+  ota_update: ^7.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: "^0.13.1"
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon_foreground.png" 
+  adaptive_icon_background: "assets/icon_background.png"
+  adaptive_icon_foreground: "assets/icon_foreground.png"
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: BebasNeue
+      fonts:
+        - asset: assets/fonts/BebasNeue-Regular.ttf
+
+  assets:
+    - assets/wheel.svg
+    - assets/gas.svg
+    - assets/brake.svg
+    - assets/gate.svg
+    - assets/shifter.svg
+    - assets/A.svg
+    - assets/B.svg
+    - assets/start.svg
+    - assets/select.svg
+    - assets/joysticksurface.svg
+    - assets/joystick.svg
+    - assets/X.svg
+    - assets/Y.svg
