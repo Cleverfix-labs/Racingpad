@@ -10,6 +10,7 @@ android {
     namespace = "com.example.racingpad_app" 
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+    buildToolsVersion = "34.0.0"
 
     compileOptions {
         // FIXED: Enabled core library desugaring to support ota_update plugin
@@ -31,11 +32,21 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("racingpad-release-key.jks")
+            storePassword = "RacingPadClever"
+            keyAlias = "racingpad"
+            keyPassword = "RacingPadClever"
+    }
+}
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
-            signingConfig = signingConfigs.getByName("debug")
-        }
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = false
+            isShrinkResources = false        }
     }
 }
 
@@ -43,7 +54,6 @@ flutter {
     source = "../.."
 }
 
-dependencies {
-    // REQUIRED: This library performs the actual "desugaring" (translation)
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    dependencies {
+        coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

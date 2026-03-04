@@ -31,10 +31,8 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
   double _lastTouchAngle = 0.0;
   Offset _navOffset = Offset.zero;
   final double _navRadius = 40;
-  bool _hasVibratedAtLimit = false; // New: To prevent continuous vibration at steering lock
+  bool _hasVibratedAtLimit = false;
 
-  bool xPressed = false;
-  bool yPressed = false;
   bool _isGasPressed = false;
   bool _isBrakePressed = false;
 
@@ -88,7 +86,7 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. STEERING WHEEL (Left Side - Centered Vertically)
+          // 1. STEERING WHEEL
           Positioned(
             left: w * 0.02,
             top: h * 0.1,
@@ -102,17 +100,13 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
                   double delta = currentAngle - _lastTouchAngle;
                   if (delta > math.pi) delta -= 2 * math.pi;
                   if (delta < -math.pi) delta += 2 * math.pi;
-                  
                   double newAngle = (_wheelAngle + delta).clamp(-_maxRotationLimit, _maxRotationLimit);
-                  
-                  // HAPTIC: Vibrate when hitting the steering lock
                   if (newAngle.abs() >= _maxRotationLimit && !_hasVibratedAtLimit) {
                     HapticFeedback.heavyImpact();
                     _hasVibratedAtLimit = true;
                   } else if (newAngle.abs() < _maxRotationLimit) {
                     _hasVibratedAtLimit = false;
                   }
-
                   setState(() {
                     _wheelAngle = newAngle;
                     _lastTouchAngle = currentAngle;
@@ -128,7 +122,7 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
             ),
           ),
 
-          // 2. GEAR SHIFTER (Restored as requested)
+          // 2. GEAR SHIFTER
           Positioned(
             left: w * 0.42,
             bottom: h * 0.1,
@@ -155,7 +149,7 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
             ),
           ),
 
-          // 3. PEDALS (Bottom Right)
+          // 3. PEDALS - FIXED WITH LISTENER
           Positioned(
             right: w * 0.05,
             bottom: h * 0.05,
@@ -169,20 +163,16 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
             ),
           ),
 
-          // 4. ACTION BUTTONS
+          // 4. ACTION BUTTONS - FIXED WITH LISTENER
           Positioned(right: w * 0.18, top: h * 0.15, child: _buildActionButton("assets/Y.svg", "BTN_Y")),
           Positioned(right: w * 0.25, top: h * 0.28, child: _buildActionButton("assets/X.svg", "BTN_X")),
           Positioned(right: w * 0.11, top: h * 0.28, child: _buildActionButton("assets/B.svg", "BTN_B")),
           Positioned(right: w * 0.18, top: h * 0.41, child: _buildActionButton("assets/A.svg", "BTN_A")),
 
           // 5. NAV JOYSTICK
-          Positioned(
-            right: w * 0.28,
-            bottom: h * 0.1,
-            child: _buildNavJoystick(),
-          ),
+          Positioned(right: w * 0.28, bottom: h * 0.1, child: _buildNavJoystick()),
 
-          // 6. MENU BUTTONS (Added medium impact haptics)
+          // 6. MENU BUTTONS
           Positioned(
             top: 20,
             left: w * 0.4,
@@ -203,39 +193,50 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
     );
   }
 
-  // ---------------- WIDGET HELPERS ----------------
+  // ---------------- FIXED WIDGET HELPERS ----------------
+
   Widget _buildPedal(String path, String cmd, double height) {
     bool isPressed = (cmd == 'GAS') ? _isGasPressed : _isBrakePressed;
-    return GestureDetector(
-      onTapDown: (_) { setState(() { if (cmd == 'GAS') {
-        _isGasPressed = true;
-      } else {
-        _isBrakePressed = true;
-      } }); HapticFeedback.vibrate(); _sendData("${cmd}_ON"); },
-      onTapUp: (_) { setState(() { if (cmd == 'GAS') {
-        _isGasPressed = false;
-      } else {
-        _isBrakePressed = false;
-      } }); _sendData("${cmd}_OFF"); },
-      onTapCancel: () { setState(() { if (cmd == 'GAS') {
-        _isGasPressed = false;
-      } else {
-        _isBrakePressed = false;
-      } }); _sendData("${cmd}_OFF"); },
-      child: AnimatedScale(scale: isPressed ? 0.8 : 1.0, duration: const Duration(milliseconds: 100), child: SvgPicture.asset(path, height: height)),
+    return Listener(
+      // behavior: HitTestBehavior.opaque ensures the entire area is sensitive to touch
+      behavior: HitTestBehavior.opaque, 
+      onPointerDown: (_) { 
+        setState(() { if (cmd == 'GAS') _isGasPressed = true; else _isBrakePressed = true; }); 
+        HapticFeedback.vibrate(); 
+        _sendData("${cmd}_ON"); 
+      },
+      onPointerUp: (_) { 
+        setState(() { if (cmd == 'GAS') _isGasPressed = false; else _isBrakePressed = false; }); 
+        _sendData("${cmd}_OFF"); 
+      },
+      // Using onPointerCancel to ensure gas stops if a system dialog or phone call interrupts
+      onPointerCancel: (_) { 
+        setState(() { if (cmd == 'GAS') _isGasPressed = false; else _isBrakePressed = false; }); 
+        _sendData("${cmd}_OFF"); 
+      },
+      child: AnimatedScale(
+        scale: isPressed ? 0.8 : 1.0, 
+        duration: const Duration(milliseconds: 100), 
+        child: SvgPicture.asset(path, height: height)
+      ),
     );
   }
 
   Widget _buildActionButton(String asset, String cmd) {
-    return GestureDetector(onTapDown: (_) { HapticFeedback.lightImpact(); _sendData(cmd); }, child: SvgPicture.asset(asset, width: 65));
-  }
+  return Listener(
+    behavior: HitTestBehavior.opaque,
+    onPointerDown: (_) { 
+      HapticFeedback.lightImpact(); 
+      _sendData(cmd); // This sends "BTN_A", "BTN_B", etc.
+    },
+    child: SvgPicture.asset(asset, width: 65),
+  );
+}
 
   Widget _buildMenuButton(String label, String cmd) {
-    return GestureDetector(
-      onTapDown: (_) { 
-        HapticFeedback.mediumImpact(); // Added Haptic
-        _sendData(cmd); 
-      },
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) { HapticFeedback.mediumImpact(); _sendData(cmd); },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
         decoration: BoxDecoration(color: const Color.fromARGB(255, 158, 11, 0).withOpacity(0.8), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white24)),

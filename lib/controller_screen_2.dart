@@ -35,7 +35,6 @@ class _ControllerScreen2State extends State<ControllerScreen2> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
-    // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
@@ -57,14 +56,16 @@ class _ControllerScreen2State extends State<ControllerScreen2> {
     }
   }
 
+  // FIXED: Trigger buttons now use Listener to prevent "Untapping" during intense races
   Widget _buildTriggerButton(String label) {
-    return GestureDetector(
-      onTapDown: (_) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) {
         HapticFeedback.mediumImpact();
         _send("$label:1.00");
       },
-      onTapUp: (_) => _send("$label:0.00"),
-      onTapCancel: () => _send("$label:0.00"),
+      onPointerUp: (_) => _send("$label:0.00"),
+      onPointerCancel: (_) => _send("$label:0.00"),
       child: Container(
         width: 80, height: 80,
         decoration: BoxDecoration(
@@ -78,9 +79,11 @@ class _ControllerScreen2State extends State<ControllerScreen2> {
     );
   }
 
+  // FIXED: Standard buttons (A, B, X, Y, LB, RB) upgraded for rock-solid input
   Widget _buildButton(String label, {double size = 60, String? customMsg}) {
-    return GestureDetector(
-      onTapDown: (_) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) {
         HapticFeedback.lightImpact();
         _send(customMsg ?? "BTN_$label");
       },
@@ -93,17 +96,32 @@ class _ControllerScreen2State extends State<ControllerScreen2> {
     );
   }
 
+  // FIXED: D-Pad arrows replaced with Listener for better response in menus
   Widget _buildDPad() {
     return Container(
       width: 140, height: 140,
       decoration: BoxDecoration(color: backgroundGrey, shape: BoxShape.circle, border: Border.all(color: accentGrey)),
       child: Stack(
         children: [
-          Align(alignment: Alignment.topCenter, child: IconButton(onPressed: () => _send("BTN_UP"), icon: const Icon(Icons.keyboard_arrow_up, color: Colors.white, size: 35))),
-          Align(alignment: Alignment.bottomCenter, child: IconButton(onPressed: () => _send("BTN_DOWN"), icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 35))),
-          Align(alignment: Alignment.centerLeft, child: IconButton(onPressed: () => _send("BTN_LEFT"), icon: const Icon(Icons.keyboard_arrow_left, color: Colors.white, size: 35))),
-          Align(alignment: Alignment.centerRight, child: IconButton(onPressed: () => _send("BTN_RIGHT"), icon: const Icon(Icons.keyboard_arrow_right, color: Colors.white, size: 35))),
+          Align(alignment: Alignment.topCenter, child: _buildDPadArrow(Icons.keyboard_arrow_up, "BTN_UP")),
+          Align(alignment: Alignment.bottomCenter, child: _buildDPadArrow(Icons.keyboard_arrow_down, "BTN_DOWN")),
+          Align(alignment: Alignment.centerLeft, child: _buildDPadArrow(Icons.keyboard_arrow_left, "BTN_LEFT")),
+          Align(alignment: Alignment.centerRight, child: _buildDPadArrow(Icons.keyboard_arrow_right, "BTN_RIGHT")),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDPadArrow(IconData icon, String cmd) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) {
+        HapticFeedback.lightImpact();
+        _send(cmd);
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Icon(icon, color: Colors.white, size: 45), // Increased size for better target area
       ),
     );
   }
@@ -164,7 +182,7 @@ class _ControllerScreen2State extends State<ControllerScreen2> {
             Positioned(top: 70, left: screenWidth * 0.58, child: _buildButton("≡", size: 50, customMsg: "BTN_STA")),
             Positioned(bottom: 20, left: screenWidth * 0.25, child: _buildJoystick(true)),
             Positioned(bottom: 20, right: screenWidth * 0.25, child: _buildJoystick(false)),
-            Positioned(bottom: 40, left: 20, child: _buildDPad()), // 🔥 RESTORED D-PAD
+            Positioned(bottom: 40, left: 20, child: _buildDPad()),
             Positioned(bottom: 20, right: 70, child: _buildButton("A")),
             Positioned(bottom: 80, right: 10, child: _buildButton("B")),
             Positioned(bottom: 80, right: 130, child: _buildButton("X")),
