@@ -1,9 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
 import 'package:udp/udp.dart';
+import 'package:vibration/vibration.dart';
+
+class RacingPadController {
+  RawDatagramSocket? _socket;
+
+  void setupConnection(String pcIp) async {
+    _socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+    print("UDP Socket bound to port ${_socket!.port}");
+
+    // --- THE LISTENER ---
+    _socket!.listen((RawSocketEvent event) {
+      if (event == RawSocketEvent.read) {
+        Datagram? dg = _socket!.receive();
+        if (dg != null) {
+          String message = utf8.decode(dg.data);
+          _handleIncomingMessage(message);
+        }
+      }
+    });
+  }
+
+  void _handleIncomingMessage(String message) {
+    if (message.startsWith("VIB:")) {
+      // Split "VIB:255:100" into ["VIB", "255", "100"]
+      List<String> parts = message.split(":");
+      int largeMotor = int.parse(parts[1]); // Heavy thud (0-255)
+      int smallMotor = int.parse(parts[2]); // High-freq buzz (0-255)
+
+      _triggerVibration(largeMotor, smallMotor);
+    }
+  }
+
+  void _triggerVibration(int large, int small) async {
+    if (await Vibration.hasVibrator() ?? false) {
+      if (large > 100) {
+        // Impact/Collision: Strong pulse
+        Vibration.vibrate(duration: 150, amplitude: large); 
+      } else if (small > 20) {
+        // Road texture/Engine: Subtle, continuous buzz
+        Vibration.vibrate(duration: 50, amplitude: small);
+      }
+    }
+  }
+}
 
 class RacingControllerScreen extends StatefulWidget {
   final UDP? sender;
@@ -41,6 +86,8 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
   late AnimationController _shifterController;
   late Animation<Offset> _shifterAnimation;
 
+  UDP? _receiver;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +99,45 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
     });
     _shifterController = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
     _shifterController.addListener(() => setState(() => _shifterOffset = _shifterAnimation.value));
+    _initReceiver();
+  }
+ 
+void _initReceiver() async {
+    _receiver = await UDP.bind(Endpoint.any(port: Port(5000)));
+
+    _receiver!.asStream().listen((datagram) {
+      if (datagram == null) return;
+
+      String message = String.fromCharCodes(datagram.data).trim();
+      debugPrint("Received from PC: $message");
+
+      // FIX: Matches "VIB:left,right" from Python
+      if (message.startsWith("VIB:")) {
+        try {
+          String data = message.split(":")[1];
+          List<String> parts = data.split(":");
+          
+          // Parse as double because Python sends 0.0 to 1.0
+          double leftIntensity = double.tryParse(parts[0]) ?? 0.0;
+          
+          if (leftIntensity > 0.7) {
+            HapticFeedback.heavyImpact();
+          } else if (leftIntensity > 0.3) {
+            HapticFeedback.mediumImpact();
+          } else if (leftIntensity > 0.05) {
+            HapticFeedback.lightImpact();
+          }
+        } catch (e) {
+          debugPrint("Vibration Parse Error: $e");
+        }
+      } 
+      else if (message == "CRASH") {
+        HapticFeedback.heavyImpact();
+      } 
+      else if (message == "ABS") {
+        HapticFeedback.mediumImpact();
+      }
+    });
   }
 
   // ---------------- LOGIC ----------------
@@ -268,6 +354,7 @@ class _RacingControllerScreenState extends State<RacingControllerScreen> with Ti
   void dispose() {
     _wheelController.dispose();
     _shifterController.dispose();
+    _receiver?.close();   // ADD THIS LINE
     super.dispose();
   }
 }

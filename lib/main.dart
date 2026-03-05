@@ -9,19 +9,12 @@ import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:racingpad_app/update_service.dart';
+import 'package:vibration/vibration.dart'; // NEW: Haptic support
 
 void main() async {
-  // 1. Ensure the Flutter framework is ready for plugin calls
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 2. Initialize AdMob
   await MobileAds.instance.initialize();
-
-  // 3. Start the Update Check (non-blocking)
-  // We don't 'await' this so the app doesn't stay on a black screen if the internet is slow.
   UpdateService.checkAndApplyUpdate();
-
-  // 4. Launch your app UI
   runApp(const RacingPadApp());
 }
 
@@ -34,29 +27,21 @@ class RacingPadApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        brightness: Brightness.dark, // Premium dark feel for gamers
-        
-        // 60% Dominant: Midnight Blue
+        brightness: Brightness.dark,
         primaryColor: const Color(0xFF03045E), 
         scaffoldBackgroundColor: const Color(0xFF03045E),
-
-        // Updated Color Scheme
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF03045E),
           brightness: Brightness.dark,
-          secondary: const Color(0xFFFF1801), // Racing Red
-          surface: const Color(0xFF0077B6),    // Electric Blue
+          secondary: const Color(0xFFFF1801),
+          surface: const Color(0xFF0077B6),
         ),
-
-        // Polished AppBar
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF03045E),
           foregroundColor: Colors.white,
           centerTitle: true,
           elevation: 0,
         ),
-
-        // Navigation Bar Styling
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: Color(0xFF02022E),
           selectedItemColor: Color(0xFF0077B6),
@@ -82,7 +67,6 @@ class _MainScreenState extends State<MainScreen> {
   int pcPort = 5000;
   UDP? sender;
 
-  // ================= TIMER & AD LOGIC =================
   int _remainingSeconds = 1800; 
   Timer? _sessionTimer;
   
@@ -240,10 +224,9 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // ================= NAVIGATION & CONNECTION =================
-
   void _onItemTapped(int index) => setState(() => _selectedIndex = index);
 
+  // ================= UPDATED SCANNER WITH HAPTIC LISTENER =================
   void _openScanner() {
     bool isScanning = false;
     Navigator.of(context).push(
@@ -260,6 +243,30 @@ class _MainScreenState extends State<MainScreen> {
               List<String> parts = code.split(':');
               if (parts.length == 2) {
                 final udpInstance = await UDP.bind(Endpoint.any());
+                
+                // NEW: Listen for Haptic Data from PC
+                // Inside _openScanner where it says "NEW: Listen for Haptic Data"
+udpInstance.asStream().listen((datagram) async {
+  if (datagram != null) {
+    String msg = String.fromCharCodes(datagram.data);
+
+    if (msg.startsWith("VIB:")) {
+      List<String> motors = msg.split(":")[1].split(",");
+
+      double intensity = double.tryParse(motors[0]) ?? 0.0;
+
+      if (intensity > 0) {
+        if (await Vibration.hasVibrator() ?? false) {
+          Vibration.vibrate(
+            duration: 100,
+            amplitude: (intensity * 255).toInt(),
+          );
+        }
+      }
+    }
+  }
+});
+
                 if (!mounted) return;
                 setState(() {
                   sender = udpInstance;
@@ -291,8 +298,6 @@ class _MainScreenState extends State<MainScreen> {
       isConnected = false;
     });
   }
-
-  // ================= UI TABS =================
 
   Widget _buildHome() {
     bool outOfTime = _remainingSeconds <= 0;
@@ -344,11 +349,11 @@ class _MainScreenState extends State<MainScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton.icon(
-                  onPressed: _sendPing, 
-                  icon: const Icon(Icons.sensors), 
-                  label: const Text("Ping"),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0077B6), foregroundColor: Colors.white),
-                ),
+  onPressed: _sendPing, 
+  icon: const Icon(Icons.sensors), 
+  label: const Text("Ping"),
+  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0077B6), foregroundColor: Colors.white),
+),
                 const SizedBox(width: 15),
                 ElevatedButton.icon(
                   onPressed: _disconnect, 
@@ -400,7 +405,7 @@ class _MainScreenState extends State<MainScreen> {
                 ElevatedButton.icon(
                   onPressed: _isAdLoading ? null : _watchAdToCollectTime,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF1801), // 10% Accent: Racing Red
+                    backgroundColor: const Color(0xFFFF1801),
                     foregroundColor: Colors.white, 
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)
                   ),
@@ -425,17 +430,17 @@ class _MainScreenState extends State<MainScreen> {
 
     return Scaffold(
       appBar: AppBar(
-  title: const Text(
-    "RACINGPAD", 
-    style: TextStyle(
-      fontFamily: 'BebasNeue',
-      fontSize: 28,          // Bebas looks best when large
-      letterSpacing: 1.5,     // Adds a premium "spaced" look
-      fontWeight: FontWeight.bold,
-    ),
-  ),
-  centerTitle: true,
-),
+        title: const Text(
+          "RACINGPAD", 
+          style: TextStyle(
+            fontFamily: 'BebasNeue',
+            fontSize: 28,
+            letterSpacing: 1.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: Stack(
         children: [
           pages[_selectedIndex],
